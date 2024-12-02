@@ -41,3 +41,9 @@ windows：
 ```
 python volume.py -m models\XXX.pth -d dcms\XXX.dcm -o output 
 ```
+
+查看已经生成的3D点云文件请输入以下命令
+3D点云*.pcd文件默认存放在 output/XXX/3D/XXX.pcd 'XXX'是dcm文件名
+```
+python show3D.py --pcd_file pcd文件的所在路径 
+```
