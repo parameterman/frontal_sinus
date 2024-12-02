@@ -263,6 +263,15 @@ def main():
     pixel_spacing = args.pixel_spacing
     slices_path = args.slices_path
     need_mask = args.need_mask
+
+    if not os.path.exists(model_path):
+        print("模型不存在")
+        if not os.path.exists(os.path.dirname(model_path)):
+            os.makedirs(os.path.dirname(model_path))
+        print("请将模型放在模型目录:",os.path.dirname(model_path))
+        return
+    if not os.path.exists(os.path.dirname(slices_path)):
+        os.makedirs(os.path.dirname(slices_path))
     if not os.path.exists(slices_path):
         if not os.path.exists(dcm_path):
             print("dcm文件不存在")
