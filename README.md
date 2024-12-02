@@ -18,6 +18,8 @@ git clone https://github.com/yuanming-hu/frontal_sinus.git
 
 然后cd进入到frontal_sinus目录下，运行命令：
 
+python init.py
+
 python volume.py
 
 首次运行后会在当前工作目录下创建多个文件夹，请将需要测量的dcm文件放在/dcms文件夹下；模型放在/models文件夹下，
