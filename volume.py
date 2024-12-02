@@ -252,7 +252,7 @@ def main():
     paser = argparse.ArgumentParser()
     paser.add_argument('-m','--model_path', type=str, default='models\\MishUNet_model_latest_2.pth', help='模型路径')
     paser.add_argument('-d','--dcm_path', type=str, default='dcms\\20241130.dcm', help='dcm文件路径')
-    paser.add_argument('-s','--slices_path', type=str, default='slices\\20241130', help='切片文件路径')
+    paser.add_argument('-s','--slices_path', type=str, default='slices', help='切片文件路径')
     paser.add_argument('-o','--output_dir', type=str, default='output', help='输出路径')
     paser.add_argument('-p','--pixel_spacing', type=tuple, default=(0.015,0.015,0.015),  help='像素间距')
     paser.add_argument('--need_mask', type=bool, default=False, help='是否需要保存预测结果图片')
@@ -270,8 +270,12 @@ def main():
             os.makedirs(os.path.dirname(model_path))
         print("请将模型放在模型目录:",os.path.dirname(model_path))
         return
-    if not os.path.exists(os.path.dirname(slices_path)):
-        os.makedirs(os.path.dirname(slices_path))
+    
+    if not os.path.exists(slices_path):
+        os.makedirs(slices_path)
+    slices_dir = os.path.basename(dcm_path).split('.')[0]
+    slices_path = os.path.join(slices_path,slices_dir)
+    
     if not os.path.exists(slices_path):
         if not os.path.exists(dcm_path):
             print("dcm文件不存在")
@@ -279,10 +283,16 @@ def main():
         else:
             print("切片文件不存在，开始切片")
             dcm = split_dcm.load_dicom_file(dcm_path)
+            
+            if not os.path.exists(slices_path):
+                os.makedirs(slices_path)
             split_dcm.save_slices(dcm, 1, 'coronal', slices_path)
             print("切片文件保存到",slices_path)
     print("dcm文件路径:",dcm_path)
     print("切片文件路径:",slices_path)
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
     basename = os.path.basename(slices_path)
     output_dir = os.path.join(output_dir,basename) # 输出路径 output/20241130
     if not os.path.exists(output_dir):
