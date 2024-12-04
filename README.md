@@ -14,12 +14,6 @@ conda activate frontal_sinus
 ```
 
 
-安装依赖：
-```
-pip install -r requirements.txt
-```
-
-
 执行git clone命令：
 
 ```
@@ -27,6 +21,14 @@ git clone https://github.com/yuanming-hu/frontal_sinus.git
 ```
 
 然后cd进入到frontal_sinus目录下，运行命令：
+
+
+安装依赖：
+```
+pip install -r requirements.txt
+```
+
+初始化目录：
 ```
 python init.py
 ```
