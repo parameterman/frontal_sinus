@@ -1,5 +1,7 @@
 import argparse
 import glob
+
+import torchvision
 import open3d
 import open3d.visualization
 import pydicom
@@ -95,6 +97,25 @@ def init_net(model_path):
     net.eval()
     return net,device
 
+def init_detector(model_path):
+    device = torch.device('cpu')
+    # 加载网络，图片单通道，分类为1。
+    # dataset_test = image_path
+
+    model = torchvision.models.detection.__dict__['fasterrcnn_resnet50_fpn'](num_classes=2,
+                                            pretrained=False)
+
+    # model.load_state_dict(torch.load("models\\model_resnet50.pth",
+    #                                    map_location=device)['model'])
+    model.load_state_dict(torch.load(model_path,
+                                       map_location=device)['model'])
+    model.eval()
+    # device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    model.to(device)
+
+    return model
+
+
 def predict(net, device, tests_path,output_dir,pixel_spacing):
     
     volume = 0
@@ -129,8 +150,8 @@ def predict(net, device, tests_path,output_dir,pixel_spacing):
         # 提取结果
         pred = np.array(pred.data.cpu()[0])[0]
         # label = np.array(label_tensor.data.cpu()[0])[0]
-        pred[pred > 0.2] = 255
-        pred[pred <= 0.2] = 0
+        pred[pred > 0.5] = 255
+        pred[pred <= 0.5] = 0
         pred_area = np.sum(pred == 255)
         save_path = os.path.join(save_root,os.path.basename(test_path))
         cv2.imwrite(save_path,pred)
@@ -141,7 +162,7 @@ def predict(net, device, tests_path,output_dir,pixel_spacing):
         # label_area = np.sum(label == 255)*pixel_size*pixel_size
     return volume
 
-def predict_nosave(net, device, tests_path,output_dir,pixel_spacing):
+def predict_nosave(net, device, tests_path,output_dir,pixel_spacing,detector=None):
     volume = 0
     ids = 0
     first_array = np.array(cv2.imread(tests_path[0]))
@@ -154,37 +175,48 @@ def predict_nosave(net, device, tests_path,output_dir,pixel_spacing):
         print_progress(ids+1, len(tests_path), prefix="Progress:{}".format(ids+1), suffix='Complete', length=50)
         # 读取图片
         img = cv2.imread(test_path)
-        # label = cv2.imread(label_path)
-        # 转为灰度图
         img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-        # label = cv2.cvtColor(label, cv2.COLOR_RGB2GRAY)
-        # _, label = cv2.threshold(label, 0, 255, cv2.THRESH_BINARY)
-        # 转为batch为1，通道为1，大小为512*512的数组
-        # img = cv2.resize(img, (534, 534))
         img = img.reshape(1, 1, img.shape[0], img.shape[1])
-        # label = label.reshape(1, 1, label.shape[0], label.shape[1])
-        
+
         # 转为tensor
         img_tensor = torch.from_numpy(img)
         # label_tensor = torch.from_numpy(label)
         # 将tensor拷贝到device中，只用cpu就是拷贝到cpu中，用cuda就是拷贝到cuda中。
         img_tensor = img_tensor.to(device=device, dtype=torch.float32)
         
-        
+
         # 预测
         pred = net(img_tensor)
         # 提取结果
         pred = np.array(pred.data.cpu()[0])[0]
         # label = np.array(label_tensor.data.cpu()[0])[0]
-        pred[pred > 0.2] = 255
-        pred[pred <= 0.2] = 0
-        image_array[:, tests_path.index(test_path),:] = pred
-        pred_area = np.sum(pred == 255)
-        # save_path = os.path.join(save_root,os.path.basename(test_path))
-        # cv2.imwrite(save_path,pred)
-        # print(test_path,pred_area,"pixels")
-        pixel_volume = pixel_spacing[0]*pixel_spacing[1]*pixel_spacing[2]
-        volume += pred_area*pixel_volume
+        if detector is not None:
+            img_r = cv2.imread(test_path,cv2.IMREAD_GRAYSCALE)
+            img_d = cv2.cvtColor(img_r, cv2.COLOR_GRAY2RGB)
+            img_d = torchvision.transforms.ToTensor()(img_d)
+            img_d.resize_(1,3,img_d.shape[1],img_d.shape[2])
+            # img = img.to(device=torch.device('cuda'))
+            output = detector(img_d)
+            boxes = output[0]['boxes'].detach().cpu().numpy()
+            # labels = output[0]['labels'].detach().cpu().numpy()
+            scores = output[0]['scores'].detach().cpu().numpy()
+            # output = detector(img_tensor)
+            if len(boxes) > 0:
+                pred[pred > 0.5] = 255
+                pred[pred <= 0.5] = 0
+                image_array[:, tests_path.index(test_path),:] = pred
+                pred_area = np.sum(pred == 255)
+
+                pixel_volume = pixel_spacing[0]*pixel_spacing[1]*pixel_spacing[2]
+                volume += pred_area*pixel_volume
+        else:
+            pred[pred > 0.5] = 255
+            pred[pred <= 0.5] = 0
+            image_array[:, tests_path.index(test_path),:] = pred
+            pred_area = np.sum(pred == 255)
+
+            pixel_volume = pixel_spacing[0]*pixel_spacing[1]*pixel_spacing[2]
+            volume += pred_area*pixel_volume
         ids += 1
     save_path = os.path.join(output_dir,'image_array.npy')
     np.save(save_path,image_array)
@@ -248,6 +280,50 @@ def STL_show(stl_path):
     ax.set_aspect('auto')
     plt.show()
 
+
+def predict_detect(image_path):
+
+    dataset_test = image_path
+
+    model = torchvision.models.detection.__dict__['fasterrcnn_resnet50_fpn'](num_classes=2,
+                                            pretrained=False)
+
+    model.load_state_dict(torch.load("models\\model_resnet50.pth",map_location=torch.device('cpu'))['model'])
+
+    model.eval()
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    model.to(device)
+
+    num = 0
+    out_dir = os.path.join("output","detection")
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+    outputs = []
+    for root,dirs,files in os.walk(dataset_test):
+        for file in files:
+            print_progress(num+1, len(files), prefix='Progress:', suffix='Complete', length=50)
+            if file.endswith(".png"):
+                img_path = os.path.join(root,file)
+                img_r = cv2.imread(img_path,cv2.IMREAD_GRAYSCALE)
+                img = cv2.cvtColor(img_r, cv2.COLOR_GRAY2RGB)
+                img = torchvision.transforms.ToTensor()(img)
+                img.resize_(1,3,img.shape[1],img.shape[2])
+                # img = img.to(device=torch.device('cuda'))
+                output = model(img)
+                boxes = output[0]['boxes'].detach().cpu().numpy()
+                # labels = output[0]['labels'].detach().cpu().numpy()
+                scores = output[0]['scores'].detach().cpu().numpy()
+                
+                # outputs.append(output)
+                for i in range(len(boxes)):
+                    x1,y1,x2,y2 = boxes[i]
+                    if scores[i] > 0.5:
+
+                        cv2.rectangle(img_r,(int(x1),int(y1)),(int(x2),int(y2)),(255,0,0),2)
+                # cv2.imwrite(os.path.join(out_dir,str(num)+".png"),img_r)
+                num += 1
+        
+    # return outputs
 def main():
     paser = argparse.ArgumentParser()
     paser.add_argument('-m','--model_path', type=str, default='models\\MishUNet_model_latest_2.pth', help='模型路径')
@@ -264,6 +340,7 @@ def main():
     slices_path = args.slices_path
     need_mask = args.need_mask
 
+    model_detect_path = "models\\model_resnet50.pth"
     if not os.path.exists(model_path):
         print("模型不存在")
         if not os.path.exists(os.path.dirname(model_path)):
@@ -276,6 +353,8 @@ def main():
     slices_dir = os.path.basename(dcm_path).split('.')[0]
     slices_path = os.path.join(slices_path,slices_dir)
     
+
+
     if not os.path.exists(slices_path):
         if not os.path.exists(dcm_path):
             print("dcm文件不存在")
@@ -291,6 +370,8 @@ def main():
     print("dcm文件路径:",dcm_path)
     print("切片文件路径:",slices_path)
 
+    # predict_detect(slices_path)
+
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     basename = os.path.basename(slices_path)
@@ -300,10 +381,13 @@ def main():
 
     # 加载网络
     net,device = init_net(model_path)
+    detector = init_detector(model_detect_path)
     tests_path = glob.glob(slices_path + '/*.png')
 # 保存3D数组
     save_path = os.path.join(output_dir,'image_array.npy')  # 三维数组输出路径 output/20241130/image_array.npy
     
+
+
     if need_mask:
         # 预测并保存预测结果图片
         pred_path = os.path.join(output_dir,'pred')  #预测结果路径 output/20241130/pred
@@ -316,7 +400,7 @@ def main():
         
     else:
         # 预测并保存3D数组
-        volume = predict_nosave(net,device, tests_path,output_dir,pixel_spacing)
+        volume = predict_nosave(net,device, tests_path,output_dir,pixel_spacing,detector)
     
     print("体积:",volume,"cm^3")
     volumn = np.load(save_path)
