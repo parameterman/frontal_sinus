@@ -12,3 +12,6 @@ def init():
     
     if not os.path.exists('slices'):
         os.mkdir('slices')
+
+if __name__ == '__main__':
+    init()
