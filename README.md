@@ -49,3 +49,8 @@ python volume.py -m models\XXX.pth -d dcms\XXX.dcm -o output
 ```
 python show3D.py --pcd_file pcd文件的所在路径 
 ```
+
+采用3向投影修正测量结果，在每个方向对术前术后的投影进行差集运算并裁剪，得出共同区域，降低因位置测量误差带来的影响。
+```
+python setDiff.py --before 术前点云文件路径 --after 术后点云文件路径 
+```
