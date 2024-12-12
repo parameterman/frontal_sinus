@@ -165,6 +165,7 @@ def predict(net, device, tests_path,output_dir,pixel_spacing):
 def predict_nosave(net, device, tests_path,output_dir,pixel_spacing,detector=None):
     volume = 0
     ids = 0
+    valid_ids = 0
     first_array = np.array(cv2.imread(tests_path[0]))
     depth = len(tests_path)
     image_array = np.zeros((first_array.shape[0],first_array.shape[1],depth),dtype=np.uint16)
@@ -204,7 +205,7 @@ def predict_nosave(net, device, tests_path,output_dir,pixel_spacing,detector=Non
             if len(boxes) > 0:
                 pred[pred > 0.5] = 255
                 pred[pred <= 0.5] = 0
-                image_array[:, tests_path.index(test_path),:] = pred
+                image_array[:, valid_ids,:] = pred
                 pred_area = np.sum(pred == 255)
 
                 pixel_volume = pixel_spacing[0]*pixel_spacing[1]*pixel_spacing[2]
@@ -212,12 +213,13 @@ def predict_nosave(net, device, tests_path,output_dir,pixel_spacing,detector=Non
         else:
             pred[pred > 0.5] = 255
             pred[pred <= 0.5] = 0
-            image_array[:, tests_path.index(test_path),:] = pred
+            image_array[:, valid_ids,:] = pred
             pred_area = np.sum(pred == 255)
 
             pixel_volume = pixel_spacing[0]*pixel_spacing[1]*pixel_spacing[2]
             volume += pred_area*pixel_volume
         ids += 1
+        valid_ids += 1
     save_path = os.path.join(output_dir,'image_array.npy')
     np.save(save_path,image_array)
     print("3D image saved to",save_path)
