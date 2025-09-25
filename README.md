@@ -1,5 +1,5 @@
 # frontal_sinus
-##上额窦CT影响测量
+##上额窦CT影像测量
 
 首先，请确保下载了conda，创建conda虚拟环境：
 
